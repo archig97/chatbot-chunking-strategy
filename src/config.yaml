@@ -1,0 +1,8 @@
+provider: openai # one of [openai, ollama]
+model: gpt-4o-mini # for provider=openai; for ollama e.g. 'llama3.1'
+embed_model: sentence-transformers/all-MiniLM-L6-v2
+index_path: data/index/code_index.faiss
+store_path: data/index/store.npy
+meta_path: data/index/meta.json
+k: 6
+score_threshold: 0.0

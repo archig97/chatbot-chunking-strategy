@@ -1,0 +1,14 @@
+# PDF/text
+pdfminer.six==20240706
+
+# Embeddings & Vector store
+sentence-transformers==3.0.1
+faiss-cpu==1.8.0.post1
+numpy==1.26.4
+PyYAML==6.0.2
+pydantic==2.9.2
+
+# LLM clients (choose one at runtime)
+openai==1.50.2
+ollama==0.3.1
+
