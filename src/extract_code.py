@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Dict, List
+import os
 
 from utils.pdf import extract_pdf_text_with_pages
 from utils.text import find_code_blocks, normalize_code_whitespace
@@ -27,10 +28,13 @@ def extract_pdf_code(pdf_path: str, out_dir: str = "data/processed") -> str:
 
 
 if __name__ == "__main__":
+    '''
     import sys
     if len(sys.argv) < 2:
-        print("Usage: python -m src.extract_code <path/to.pdf> [out_dir]")
+        print("Usage: python src/build_index.py <path/to.pdf> [config.yaml]")
         raise SystemExit(1)
-    pdf_path = sys.argv[1]
-    out_dir = sys.argv[2] if len(sys.argv) > 2 else "data/processed"
-    extract_pdf_code(pdf_path, out_dir)
+    '''
+    print(os.listdir())
+    pdf = "data/pdfs/python_code.pdf"
+    out_dir = "data/processed"
+    extract_pdf_code(pdf, out_dir)

@@ -1,0 +1,62 @@
+[
+  {
+    "id": "block_0000",
+    "page": 1,
+    "code": "utility_tools.py\n\"\"\"\nimport urllib.error"
+  },
+  {
+    "id": "block_0001",
+    "page": 1,
+    "code": "utility_tools.py\n\"\"\"\nimport urllib.error\nT = TypeVar(\"T\")"
+  },
+  {
+    "id": "block_0002",
+    "page": 1,
+    "code": "utility_tools.py\n\"\"\"\nimport urllib.error\nT = TypeVar(\"T\")\n    raise last_exc"
+  },
+  {
+    "id": "block_0003",
+    "page": 1,
+    "code": "utility_tools.py\n\"\"\"\nimport urllib.error\nT = TypeVar(\"T\")\n    raise last_exc\n        yield buf"
+  },
+  {
+    "id": "block_0004",
+    "page": 1,
+    "code": "utility_tools.py\n\"\"\"\nimport urllib.error\nT = TypeVar(\"T\")\n    raise last_exc\n        yield buf\n        print(f\"[TIMER] {name}: {end - start:.6f}s\", file=sys.stderr)"
+  },
+  {
+    "id": "block_0005",
+    "page": 1,
+    "code": "utility_tools.py\n\"\"\"\nimport urllib.error\nT = TypeVar(\"T\")\n    raise last_exc\n        yield buf\n        print(f\"[TIMER] {name}: {end - start:.6f}s\", file=sys.stderr)\n            return raw.decode(\"latin-1\", errors=\"replace\")"
+  },
+  {
+    "id": "block_0006",
+    "page": 1,
+    "code": "utility_tools.py\n\"\"\"\nimport urllib.error\nT = TypeVar(\"T\")\n    raise last_exc\n        yield buf\n        print(f\"[TIMER] {name}: {end - start:.6f}s\", file=sys.stderr)\n            return raw.decode(\"latin-1\", errors=\"replace\")\ndef quicksort(a: List[T]) -> List[T]:"
+  },
+  {
+    "id": "block_0007",
+    "page": 2,
+    "code": "    return quicksort(left) + middle + quicksort(right)"
+  },
+  {
+    "id": "block_0008",
+    "page": 2,
+    "code": "    return quicksort(left) + middle + quicksort(right)\n        a, b = b, a + b"
+  },
+  {
+    "id": "block_0009",
+    "page": 2,
+    "code": "    return quicksort(left) + middle + quicksort(right)\n        a, b = b, a + b\n    return p.parse_args(argv)"
+  },
+  {
+    "id": "block_0010",
+    "page": 2,
+    "code": "    return quicksort(left) + middle + quicksort(right)\n        a, b = b, a + b\n    return p.parse_args(argv)\n            print(\"Error sorting inputs:\", e, file=sys.stderr)"
+  },
+  {
+    "id": "block_0011",
+    "page": 2,
+    "code": "    return quicksort(left) + middle + quicksort(right)\n        a, b = b, a + b\n    return p.parse_args(argv)\n            print(\"Error sorting inputs:\", e, file=sys.stderr)\n    main()"
+  }
+]

@@ -57,10 +57,12 @@ def build_index_from_pdf(pdf_path: str, config_path: str = "src/config.yaml") ->
 
 
 if __name__ == "__main__":
+    '''
     import sys
     if len(sys.argv) < 2:
         print("Usage: python src/build_index.py <path/to.pdf> [config.yaml]")
         raise SystemExit(1)
-    pdf = sys.argv[1]
-    cfg = sys.argv[2] if len(sys.argv) > 2 else "src/config.yaml"
+    '''
+    pdf = "data\pdfs\python_code.pdf"
+    cfg = "src\config.yaml"
     build_index_from_pdf(pdf, cfg)
