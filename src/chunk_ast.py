@@ -1,64 +1,128 @@
-from __future__ import annotations
-import ast
-from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional
+import re
+import json
+from pathlib import Path
+from pdfminer.high_level import extract_pages
+from pdfminer.layout import LTTextContainer, LTTextLine
+
+PDF_PATH = "data/pdfs/saasbook.pdf"  # your uploaded PDF
+
+# --- heuristics for recognizing headings like:
+# "1 Introduction to Software as a Service..."
+# "1.2 Software Development Processes: Plan-and-Document"
+# "Preface to the Second Edition"
+HEADING_RE = re.compile(
+    r"""^(
+        (\d+(\.\d+)*)      # numbered heading like "1" or "1.2" or "10.6"
+        \s+
+        .+                 # title text
+      |
+        (Preface|Contents|About the Authors|Afterword|Appendix)   # unnumbered top-levels
+        .*
+    )$""",
+    re.IGNORECASE | re.VERBOSE
+)
+
+def iter_pdf_lines(pdf_path):
+    """
+    Yield (page_number, line_text) in reading order.
+    """
+    for page_num, page_layout in enumerate(extract_pages(pdf_path), start=1):
+        for element in page_layout:
+            if isinstance(element, LTTextContainer):
+                for text_line in element:
+                    if isinstance(text_line, LTTextLine):
+                        line = text_line.get_text().strip()
+                        if line:
+                            yield page_num, line
+
+def normalize_ws(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip()
+
+def is_heading(line: str) -> bool:
+    # We *don't* want figure captions etc. We'll just check length and regex.
+    if len(line.split()) > 30:  # too long to be a heading
+        return False
+    return bool(HEADING_RE.match(line))
+
+def build_ast_nodes(pdf_path):
+    """
+    Returns a list of 'nodes'.
+    Each node ~ one logical section with:
+      {
+        "id": "...",
+        "title": "...",
+        "pages": [int,...],
+        "text_blocks": ["para1 ...", "para2 ...", ...]
+      }
+    """
+    nodes = []
+    current_node = None
+    buffer_paragraph_lines = []
+
+    def flush_paragraph():
+        nonlocal buffer_paragraph_lines, current_node
+        if buffer_paragraph_lines and current_node is not None:
+            para = normalize_ws(" ".join(buffer_paragraph_lines))
+            if para:
+                current_node["text_blocks"].append(para)
+        buffer_paragraph_lines = []
+
+    def start_new_node(title, page_num):
+        return {
+            "id": f"sec_{len(nodes):04d}",
+            "title": title,
+            "pages": [page_num],
+            "text_blocks": []
+        }
+
+    last_page_for_node = None
+
+    for page_num, raw_line in iter_pdf_lines(pdf_path):
+        line = normalize_ws(raw_line)
+
+        # merge weird artifacts like "(cid:31)" etc.
+        if "(cid:" in line:
+            line = re.sub(r"\(cid:[^)]+\)", "", line).strip()
+
+        if not line:
+            # blank-ish => paragraph boundary
+            flush_paragraph()
+            continue
+
+        if is_heading(line):
+            # close out old node fully
+            flush_paragraph()
+            if current_node is not None:
+                nodes.append(current_node)
+
+            # start a new node
+            current_node = start_new_node(title=line, page_num=page_num)
+            last_page_for_node = page_num
+        else:
+            # regular body text line
+            if current_node is None:
+                # Found body text before any heading:
+                # create a "preamble" node so we don't lose it.
+                current_node = start_new_node(title="(preamble)", page_num=page_num)
+                last_page_for_node = page_num
+
+            buffer_paragraph_lines.append(line)
+
+            # track pages covered by this node
+            if last_page_for_node != page_num:
+                current_node["pages"].append(page_num)
+                last_page_for_node = page_num
+
+    # end of loop: flush remaining
+    flush_paragraph()
+    if current_node is not None:
+        nodes.append(current_node)
+
+    return nodes
 
 
-@dataclass
-class Chunk:
-    id: str
-    symbol: str
-    code: str
-    page: int
-
-
-def _symbol_name(node: ast.AST, parents: List[str]) -> str:
-    if isinstance(node, ast.FunctionDef):
-        return ".".join(parents + [node.name])
-    if isinstance(node, ast.AsyncFunctionDef):
-        return ".".join(parents + [node.name])
-    if isinstance(node, ast.ClassDef):
-        return ".".join(parents + [node.name])
-    return ".".join(parents or ["<module>"])
-
-
-def _get_source_segment(src: str, node: ast.AST) -> str:
-# ast.get_source_segment is robust when lineno/col_offset present
-    seg = ast.get_source_segment(src, node)
-    if seg is None:
-        return src
-    return seg
-
-
-def chunk_python_ast(block_id: str, code: str, page: int) -> List[Chunk]:
-    """Return AST-aware chunks: classes and top-level functions. Fallback to whole block on parse error."""
-    chunks: List[Chunk] = []
-    try:
-        mod = ast.parse(code)
-        parents: List[str] = []
-            # include module docstring/top imports as a chunk
-        module_body = code
-            # Gather class/function nodes to create clean chunks
-        for node in mod.body:
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                sym = _symbol_name(node, parents)
-                src = _get_source_segment(code, node)
-                chunks.append(Chunk(id=f"{block_id}::{sym}", symbol=sym, code=src, page=page))
-        # If no structured nodes found, fallback to whole code block
-        if not chunks:
-            chunks.append(Chunk(id=f"{block_id}::<module>", symbol="<module>", code=code, page=page))
-    except SyntaxError:
-    # PDF artifacts often break parsing; fallback to raw block
-        chunks.append(Chunk(id=f"{block_id}::<unparsed>", symbol="<unparsed>", code=code, page=page))
-    return chunks
-
-
-def chunk_blocks_python(blocks: Iterable[Dict]) -> List[Chunk]:
-    all_chunks: List[Chunk] = []
-    for b in blocks:
-        code: str = b["code"]
-        block_id: str = b["id"]
-        page: int = b["page"]
-        for ch in chunk_python_ast(block_id, code, page):
-            all_chunks.append(ch)
-    return all_chunks
+if __name__ == "__main__":
+    ast_nodes = build_ast_nodes(PDF_PATH)
+    print(f"Extracted {len(ast_nodes)} AST-style nodes/sections")
+    # save raw nodes so we can embed later
+    Path("chunk_db_raw.json").write_text(json.dumps(ast_nodes, indent=2), encoding="utf-8")

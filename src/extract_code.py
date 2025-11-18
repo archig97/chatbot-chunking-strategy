@@ -35,6 +35,6 @@ if __name__ == "__main__":
         raise SystemExit(1)
     '''
     print(os.listdir())
-    pdf = "data/pdfs/python_code.pdf"
+    pdf = "data/pdfs/ECE506_textbook.pdf"
     out_dir = "data/processed"
     extract_pdf_code(pdf, out_dir)

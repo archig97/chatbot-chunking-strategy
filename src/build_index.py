@@ -1,68 +1,57 @@
-from __future__ import annotations
-import json
-from pathlib import Path
-from typing import Dict, List
-
-import numpy as np
-from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
+import numpy as np
 import faiss
-import yaml
+from pathlib import Path
+import json
 
-from extract_code import extract_pdf_code
-from chunk_ast import chunk_blocks_python, Chunk
+EMBED_MODEL_NAME = "all-MiniLM-L6-v2"  # small+fast, good for semantic search
+RAW_DB_PATH = "chunk_db_raw.json"
+VEC_DB_PATH = "chunk_db_faiss.index"
+META_DB_PATH = "chunk_db_meta.json"
 
+def make_text_for_embedding(node):
+    """
+    Turn a node into a single string the embedder will see.
+    """
+    parts = [node["title"]]
+    parts.extend(node["text_blocks"])
+    return "\n\n".join(parts)
 
+def build_vector_store():
+    # load the AST chunks
+    ast_nodes = json.loads(Path(RAW_DB_PATH).read_text(encoding="utf-8"))
 
-class Meta(BaseModel):
-    id: str
-    symbol: str
-    page: int
+    model = SentenceTransformer(EMBED_MODEL_NAME)
 
+    corpus_texts = []
+    meta = []
+    for node in ast_nodes:
+        text_for_vec = make_text_for_embedding(node)
+        corpus_texts.append(text_for_vec)
+        meta.append({
+            "id": node["id"],
+            "title": node["title"],
+            "pages": node["pages"],
+            # store a preview so we can show snippets in answers:
+            "preview": text_for_vec[:500]
+        })
 
-def _load_blocks_json(path: str) -> List[Dict]:
-    return json.loads(Path(path).read_text())
+    embeddings = model.encode(corpus_texts, convert_to_numpy=True, show_progress_bar=True)
+    dim = embeddings.shape[1]
 
+    # build FAISS index (cosine similarity via Inner Product on normalized vectors)
+    # normalize
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True) + 1e-10
+    normed_embeddings = embeddings / norms
 
-def build_index_from_pdf(pdf_path: str, config_path: str = "src/config.yaml") -> None:
-    cfg = yaml.safe_load(Path(config_path).read_text())
-    index_path = Path(cfg["index_path"]).parent
-    index_path.mkdir(parents=True, exist_ok=True)
+    index = faiss.IndexFlatIP(dim)  # IP = inner product
+    index.add(normed_embeddings.astype(np.float32))
 
-    blocks_json = extract_pdf_code(pdf_path)
-    blocks = _load_blocks_json(blocks_json)
+    # save index and metadata
+    faiss.write_index(index, VEC_DB_PATH)
+    Path(META_DB_PATH).write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
-    # AST chunking (Python-focused). For other languages, plug in another chunker.
-    chunks: List[Chunk] = chunk_blocks_python(blocks)
-
-    # Prepare corpus
-    corpus_texts = [c.code for c in chunks]
-    meta = [Meta(id=c.id, symbol=c.symbol, page=c.page).model_dump() for c in chunks]
-
-    # Embeddings
-    embed_model = SentenceTransformer(cfg["embed_model"])
-    embs = embed_model.encode(corpus_texts, normalize_embeddings=True, show_progress_bar=True)
-    embs_np = np.asarray(embs, dtype="float32")
-
-    # FAISS index
-    dim = embs_np.shape[1]
-    index = faiss.IndexFlatIP(dim) # inner-product with normalized vectors = cosine sim
-    index.add(embs_np)
-
-    faiss.write_index(index, cfg["index_path"])
-    np.save(cfg["store_path"], np.array(corpus_texts, dtype=object))
-    Path(cfg["meta_path"]).write_text(json.dumps(meta, indent=2))
-
-    print(f"Indexed {len(chunks)} chunks from {pdf_path} → {cfg['index_path']}")
-
+    print(f"Stored {len(meta)} chunks in FAISS with dim={dim}")
 
 if __name__ == "__main__":
-    '''
-    import sys
-    if len(sys.argv) < 2:
-        print("Usage: python src/build_index.py <path/to.pdf> [config.yaml]")
-        raise SystemExit(1)
-    '''
-    pdf = "data\pdfs\python_code.pdf"
-    cfg = "src\config.yaml"
-    build_index_from_pdf(pdf, cfg)
+    build_vector_store()
